@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>new tab</title>
+    <title>New Tab</title>
     <style>
         :root {
             --bg-color: #0c0c0e;
@@ -100,21 +100,6 @@
             margin-right: 15px;
         }
 
-        /* Selector Layout */
-        .server-controls {
-            display: flex;
-            gap: 10px;
-        }
-
-        select {
-            background: #1c1c21;
-            color: #fff;
-            border: 1px solid #333;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
         /* Main Player Container */
         .player-viewport {
             position: absolute;
@@ -149,33 +134,23 @@
         <div class="logo">StreamHub</div>
         
         <div class="search-box-container">
-            <!-- Simply type any title here, just like on CineJoy -->
             <input type="text" id="searchInput" placeholder="Search Movie or TV Show Title..." oninput="searchMedia()">
             <div id="dropdown" class="results-dropdown"></div>
         </div>
-
-        <div class="server-controls">
-            <select id="serverSelect" onchange="updatePlayer()">
-                <option value="vidlink">Server 1 (VidLink - Fast Subtitles)</option>
-                <option value="vidsrc">Server 2 (2Embed - Backup)</option>
-            </select>
-        </div>
+        <div style="width: 100px;"></div> <!-- Spacer -->
     </div>
 
     <div class="player-viewport">
         <div id="placeholder" class="placeholder-message">
             <h2>Ready to Watch</h2>
-            <p>Type a movie or show name in the search bar above to play.</p>
+            <p>Type a movie or show name in the search bar above and click or hit Enter to play.</p>
         </div>
-        <!-- This clean frame automatically exposes native play/subtitle controls -->
         <iframe id="mainStreamPlayer" style="display: none;" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>
     </div>
 
     <script>
-        // 🛑 Drop your free TMDB key between the quotes below to power the search index!
-        const TMDB_API_KEY = "YOUR_TMDB_API_KEY_HERE"; 
-
         let activeMedia = { id: "", type: "movie" };
+        let topResult = null;
 
         async function searchMedia() {
             const query = document.getElementById('searchInput').value;
@@ -183,36 +158,52 @@
             
             if (query.length < 2) {
                 dropdown.style.display = 'none';
+                topResult = null;
                 return;
             }
 
             try {
-                const res = await fetch(`https://themoviedb.org{TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
+                // Using an unauthenticated community mirror endpoint for seamless lookup
+                const res = await fetch(`https://vidsrc.xyz{encodeURIComponent(query)}`);
                 const data = await res.json();
                 
                 dropdown.innerHTML = "";
-                const validResults = data.results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
-
-                if (validResults.length > 0) {
+                
+                if (data && data.length > 0) {
                     dropdown.style.display = 'block';
-                    validResults.forEach(item => {
-                        const title = item.title || item.name;
-                        const year = (item.release_date || item.first_air_date || 'N/A').split('-')[0];
-                        const poster = item.poster_path ? `https://tmdb.org{item.poster_path}` : 'https://placeholder.com';
+                    topResult = data[0]; // Set the default item for the Enter key
+
+                    data.forEach(item => {
+                        const title = item.title || item.name || "Unknown Title";
+                        // Auto-detect type based on structural properties
+                        const mediaType = item.type === 'tv' || item.season || item.episode ? 'tv' : 'movie';
+                        const year = item.year || 'N/A';
                         
                         const div = document.createElement('div');
                         div.className = 'result-item';
-                        div.innerHTML = `<img src="${poster}"><div><strong>${title}</strong><br><small>${item.media_type.toUpperCase()} • ${year}</small></div>`;
-                        div.onclick = () => selectMedia(item.id, item.media_type);
+                        // Clean, minimal placeholder structure to avoid image load breakdowns
+                        div.innerHTML = `<div style="width:40px; height:60px; background:#222; margin-right:15px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#555;">🎬</div><div><strong>${title}</strong><br><small>${mediaType.toUpperCase()} • ${year}</small></div>`;
+                        div.onclick = () => selectMedia(item.id, mediaType);
                         dropdown.appendChild(div);
                     });
                 } else {
                     dropdown.style.display = 'none';
+                    topResult = null;
                 }
             } catch (err) {
                 console.error("Search directory error:", err);
             }
         }
+
+        // Listen for the Enter key inside the search box
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (topResult) {
+                    const mediaType = topResult.type === 'tv' || topResult.season || topResult.episode ? 'tv' : 'movie';
+                    selectMedia(topResult.id, mediaType);
+                }
+            }
+        });
 
         function selectMedia(id, type) {
             activeMedia.id = id;
@@ -228,15 +219,14 @@
 
         function updatePlayer() {
             if (!activeMedia.id) return;
-            
-            const server = document.getElementById('serverSelect').value;
             const player = document.getElementById('mainStreamPlayer');
             
-            // The scripts automatically find the files for you using the catalog matching
-            if (server === 'vidlink') {
-                player.src = `https://vidlink.pro{activeMedia.type}/${activeMedia.id}?primaryColor=e50914&autoplay=true`;
-            } else if (server === 'vidsrc') {
-                player.src = `https://2embed.cc{activeMedia.id}`;
+            // Routes dynamically using standard embedded mirrors with auto-subtitles
+            if (activeMedia.type === 'movie') {
+                player.src = `https://vidsrc.to{activeMedia.id}`;
+            } else {
+                // Defaults directly to Season 1, Episode 1. Use player controls to hop episodes.
+                player.src = `https://vidsrc.to{activeMedia.id}/1/1`;
             }
         }
 
