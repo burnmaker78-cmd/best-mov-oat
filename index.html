@@ -5,252 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StreamHub</title>
     <style>
-        :root {
-            --bg-color: #0c0c0e;
-            --accent-color: #e50914;
-            --text-color: #ffffff;
-            --panel-bg: rgba(20, 20, 23, 0.95);
-        }
-
+        /* Force absolute full-screen canvas layout */
         html, body {
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            background-color: var(--bg-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            color: var(--text-color);
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            background-color: #000000;
         }
-
-        /* Nav Header Layout */
-        .top-navbar {
+        
+        /* Make the streaming interface fill the entire screen */
+        iframe {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            height: 60px;
-            background: var(--panel-bg);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            box-sizing: border-box;
-            z-index: 999999;
-            border-bottom: 1px solid #1f1f23;
-        }
-
-        .logo {
-            font-weight: 800;
-            font-size: 1.3rem;
-            color: var(--accent-color);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        /* Search Section */
-        .search-box-container {
-            position: relative;
-            display: flex;
-            gap: 8px;
-            width: 420px;
-        }
-
-        .search-box-container input {
-            width: 100%;
-            padding: 10px 15px;
-            background: #1c1c21;
-            border: 1px solid #333;
-            color: #fff;
-            border-radius: 20px;
-            outline: none;
-            box-sizing: border-box;
-        }
-
-        .search-box-container button {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 0 20px;
-            font-weight: bold;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .search-box-container button:hover {
-            background: #b80710;
-        }
-
-        /* Live dropdown results window */
-        .results-dropdown {
-            position: absolute;
-            top: 45px;
-            left: 0;
-            width: 100%;
-            background: #141417;
-            border: 1px solid #333;
-            border-radius: 8px;
-            max-height: 350px;
-            overflow-y: auto;
-            display: none;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
-        }
-
-        .result-item {
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #222;
-        }
-
-        .result-item:hover {
-            background: #1c1c21;
-        }
-
-        /* Main Player Container */
-        .player-viewport {
-            position: absolute;
-            top: 60px;
-            left: 0;
-            width: 100%;
-            height: calc(100% - 60px);
-            background: #000;
-        }
-
-        iframe {
-            width: 100%;
             height: 100%;
             border: none;
-            display: block;
-        }
-
-        .placeholder-message {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #888;
-            text-align: center;
+            margin: 0;
+            padding: 0;
+            z-index: 9999;
         }
     </style>
 </head>
 <body>
 
-    <div class="top-navbar">
-        <div class="logo">StreamHub</div>
-        
-        <div class="search-box-container">
-            <input type="text" id="searchInput" placeholder="Search Movie or TV Show Title..." oninput="searchMedia()">
-            <button onclick="triggerTopResult()">Play</button>
-            <div id="dropdown" class="results-dropdown"></div>
-        </div>
-        <div style="width: 60px;"></div> 
-    </div>
+    <!-- 
+      This embeds a developer-friendly streaming interface.
+      It bypasses browser blocks and includes its own search bar, 
+      movie catalog, play buttons, and subtitles automatically.
+    -->
+    <iframe 
+        src="https://embed.su" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" 
+        allowfullscreen>
+    </iframe>
 
-    <div class="player-viewport">
-        <div id="placeholder" class="placeholder-message">
-            <h2>Ready to Watch</h2>
-            <p>Type a movie or show name in the search bar above and click or hit Enter to play.</p>
-        </div>
-        <iframe id="mainStreamPlayer" style="display: none;" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>
-    </div>
-
-    <script>
-        let activeMedia = { id: "", type: "movie" };
-        let topResult = null; // Stores the object correctly for instant playback triggers
-
-        async function searchMedia() {
-            const query = document.getElementById('searchInput').value;
-            const dropdown = document.getElementById('dropdown');
-            
-            if (query.length < 2) {
-                dropdown.style.display = 'none';
-                topResult = null;
-                return;
-            }
-
-            try {
-                const res = await fetch(`https://vidsrc.xyz{encodeURIComponent(query)}`);
-                const data = await res.json();
-                
-                dropdown.innerHTML = "";
-                
-                if (data && data.length > 0) {
-                    dropdown.style.display = 'block';
-                    
-                    // FIXED: Explicitly capture the absolute first search result dictionary object
-                    topResult = data[0]; 
-
-                    data.forEach(item => {
-                        const title = item.title || item.name || "Unknown Title";
-                        const mediaType = item.type === 'tv' || item.season || item.episode ? 'tv' : 'movie';
-                        const year = item.year || 'N/A';
-                        
-                        const div = document.createElement('div');
-                        div.className = 'result-item';
-                        div.innerHTML = `<div style="width:40px; height:60px; background:#222; margin-right:15px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#555;">🎬</div><div><strong>${title}</strong><br><small>${mediaType.toUpperCase()} • ${year}</small></div>`;
-                        
-                        // Pass parameters right to the function layer
-                        div.onclick = () => selectMedia(item.id, mediaType);
-                        dropdown.appendChild(div);
-                    });
-                } else {
-                    dropdown.style.display = 'none';
-                    topResult = null;
-                }
-            } catch (err) {
-                console.error("Search directory error:", err);
-            }
-        }
-
-        // Action function for Enter key and Play button to launch media instantly
-        function triggerTopResult() {
-            if (topResult) {
-                const mediaType = topResult.type === 'tv' || topResult.season || topResult.episode ? 'tv' : 'movie';
-                selectMedia(topResult.id, mediaType);
-            }
-        }
-
-        // Listen for keyboard Enter hits inside the input field box
-        document.getElementById('searchInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                triggerTopResult();
-            }
-        });
-
-        function selectMedia(id, type) {
-            activeMedia.id = id;
-            activeMedia.type = type;
-            
-            document.getElementById('dropdown').style.display = 'none';
-            document.getElementById('searchInput').value = "";
-            document.getElementById('placeholder').style.display = 'none';
-            document.getElementById('mainStreamPlayer').style.display = 'block';
-            
-            updatePlayer();
-        }
-
-        function updatePlayer() {
-            if (!activeMedia.id) return;
-            const player = document.getElementById('mainStreamPlayer');
-            
-            if (activeMedia.type === 'movie') {
-                player.src = `https://vidsrc.to{activeMedia.id}`;
-            } else {
-                // TV Shows open automatically to Season 1, Episode 1. Use the embedded panel interface to hop episodes.
-                player.src = `https://vidsrc.to{activeMedia.id}/1/1`;
-            }
-        }
-
-        // Clear out open panel overlays on blank background page click selections
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.search-box-container')) {
-                document.getElementById('dropdown').style.display = 'none';
-            }
-        });
-    </script>
 </body>
 </html>
