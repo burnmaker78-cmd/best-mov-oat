@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Tab</title>
+    <title>StreamHub</title>
     <style>
         :root {
             --bg-color: #0c0c0e;
@@ -51,7 +51,9 @@
         /* Search Section */
         .search-box-container {
             position: relative;
-            width: 350px;
+            display: flex;
+            gap: 8px;
+            width: 420px;
         }
 
         .search-box-container input {
@@ -63,6 +65,21 @@
             border-radius: 20px;
             outline: none;
             box-sizing: border-box;
+        }
+
+        .search-box-container button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            font-weight: bold;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-box-container button:hover {
+            background: #b80710;
         }
 
         /* Live dropdown results window */
@@ -90,14 +107,6 @@
 
         .result-item:hover {
             background: #1c1c21;
-        }
-
-        .result-item img {
-            width: 40px;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 4px;
-            margin-right: 15px;
         }
 
         /* Main Player Container */
@@ -135,9 +144,10 @@
         
         <div class="search-box-container">
             <input type="text" id="searchInput" placeholder="Search Movie or TV Show Title..." oninput="searchMedia()">
+            <button onclick="triggerTopResult()">Play</button>
             <div id="dropdown" class="results-dropdown"></div>
         </div>
-        <div style="width: 100px;"></div> <!-- Spacer -->
+        <div style="width: 60px;"></div> 
     </div>
 
     <div class="player-viewport">
@@ -150,7 +160,7 @@
 
     <script>
         let activeMedia = { id: "", type: "movie" };
-        let topResult = null;
+        let topResult = null; // Stores the object correctly for instant playback triggers
 
         async function searchMedia() {
             const query = document.getElementById('searchInput').value;
@@ -163,7 +173,6 @@
             }
 
             try {
-                // Using an unauthenticated community mirror endpoint for seamless lookup
                 const res = await fetch(`https://vidsrc.xyz{encodeURIComponent(query)}`);
                 const data = await res.json();
                 
@@ -171,18 +180,20 @@
                 
                 if (data && data.length > 0) {
                     dropdown.style.display = 'block';
-                    topResult = data[0]; // Set the default item for the Enter key
+                    
+                    // FIXED: Explicitly capture the absolute first search result dictionary object
+                    topResult = data[0]; 
 
                     data.forEach(item => {
                         const title = item.title || item.name || "Unknown Title";
-                        // Auto-detect type based on structural properties
                         const mediaType = item.type === 'tv' || item.season || item.episode ? 'tv' : 'movie';
                         const year = item.year || 'N/A';
                         
                         const div = document.createElement('div');
                         div.className = 'result-item';
-                        // Clean, minimal placeholder structure to avoid image load breakdowns
                         div.innerHTML = `<div style="width:40px; height:60px; background:#222; margin-right:15px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#555;">🎬</div><div><strong>${title}</strong><br><small>${mediaType.toUpperCase()} • ${year}</small></div>`;
+                        
+                        // Pass parameters right to the function layer
                         div.onclick = () => selectMedia(item.id, mediaType);
                         dropdown.appendChild(div);
                     });
@@ -195,13 +206,18 @@
             }
         }
 
-        // Listen for the Enter key inside the search box
+        // Action function for Enter key and Play button to launch media instantly
+        function triggerTopResult() {
+            if (topResult) {
+                const mediaType = topResult.type === 'tv' || topResult.season || topResult.episode ? 'tv' : 'movie';
+                selectMedia(topResult.id, mediaType);
+            }
+        }
+
+        // Listen for keyboard Enter hits inside the input field box
         document.getElementById('searchInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                if (topResult) {
-                    const mediaType = topResult.type === 'tv' || topResult.season || topResult.episode ? 'tv' : 'movie';
-                    selectMedia(topResult.id, mediaType);
-                }
+                triggerTopResult();
             }
         });
 
@@ -221,15 +237,15 @@
             if (!activeMedia.id) return;
             const player = document.getElementById('mainStreamPlayer');
             
-            // Routes dynamically using standard embedded mirrors with auto-subtitles
             if (activeMedia.type === 'movie') {
                 player.src = `https://vidsrc.to{activeMedia.id}`;
             } else {
-                // Defaults directly to Season 1, Episode 1. Use player controls to hop episodes.
+                // TV Shows open automatically to Season 1, Episode 1. Use the embedded panel interface to hop episodes.
                 player.src = `https://vidsrc.to{activeMedia.id}/1/1`;
             }
         }
 
+        // Clear out open panel overlays on blank background page click selections
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-box-container')) {
                 document.getElementById('dropdown').style.display = 'none';
