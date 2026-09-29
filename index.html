@@ -3,42 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream</title>
+    <title>new tab</title>
     <style>
-        /* Force absolute full-screen and eliminate all canvas/body margins */
-        html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            overflow: hidden !important;
-            background-color: #000000;
+        :root {
+            --bg-color: #0c0c0e;
+            --accent-color: #e50914;
+            --text-color: #ffffff;
+            --panel-bg: rgba(20, 20, 23, 0.95);
         }
-        /* Ensure the iframe occupies 100% of the viewport seamlessly */
-        iframe {
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--text-color);
+        }
+
+        /* Nav Header Layout */
+        .top-navbar {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
+            height: 60px;
+            background: var(--panel-bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 999999;
+            border-bottom: 1px solid #1f1f23;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.3rem;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Search Section */
+        .search-box-container {
+            position: relative;
+            width: 350px;
+        }
+
+        .search-box-container input {
+            width: 100%;
+            padding: 10px 15px;
+            background: #1c1c21;
+            border: 1px solid #333;
+            color: #fff;
+            border-radius: 20px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        /* Live dropdown results window */
+        .results-dropdown {
+            position: absolute;
+            top: 45px;
+            left: 0;
+            width: 100%;
+            background: #141417;
+            border: 1px solid #333;
+            border-radius: 8px;
+            max-height: 350px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #222;
+        }
+
+        .result-item:hover {
+            background: #1c1c21;
+        }
+
+        .result-item img {
+            width: 40px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 15px;
+        }
+
+        /* Selector Layout */
+        .server-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        select {
+            background: #1c1c21;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Main Player Container */
+        .player-viewport {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            width: 100%;
+            height: calc(100% - 60px);
+            background: #000;
+        }
+
+        iframe {
+            width: 100%;
             height: 100%;
             border: none;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            z-index: 999999;
+            display: block;
+        }
+
+        .placeholder-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <!-- Full-screen iframe with complete hardware, video, and screen-control permissions -->
-    <iframe 
-        src="https://cinejoy.to" 
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" 
-        allowfullscreen="true"
-        webkitallowfullscreen="true"
-        mozallowfullscreen="true">
-    </iframe>
+    <div class="top-navbar">
+        <div class="logo">StreamHub</div>
+        
+        <div class="search-box-container">
+            <!-- Simply type any title here, just like on CineJoy -->
+            <input type="text" id="searchInput" placeholder="Search Movie or TV Show Title..." oninput="searchMedia()">
+            <div id="dropdown" class="results-dropdown"></div>
+        </div>
 
+        <div class="server-controls">
+            <select id="serverSelect" onchange="updatePlayer()">
+                <option value="vidlink">Server 1 (VidLink - Fast Subtitles)</option>
+                <option value="vidsrc">Server 2 (2Embed - Backup)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="player-viewport">
+        <div id="placeholder" class="placeholder-message">
+            <h2>Ready to Watch</h2>
+            <p>Type a movie or show name in the search bar above to play.</p>
+        </div>
+        <!-- This clean frame automatically exposes native play/subtitle controls -->
+        <iframe id="mainStreamPlayer" style="display: none;" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>
+    </div>
+
+    <script>
+        // 🛑 Drop your free TMDB key between the quotes below to power the search index!
+        const TMDB_API_KEY = "YOUR_TMDB_API_KEY_HERE"; 
+
+        let activeMedia = { id: "", type: "movie" };
+
+        async function searchMedia() {
+            const query = document.getElementById('searchInput').value;
+            const dropdown = document.getElementById('dropdown');
+            
+            if (query.length < 2) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            try {
+                const res = await fetch(`https://themoviedb.org{TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                
+                dropdown.innerHTML = "";
+                const validResults = data.results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+
+                if (validResults.length > 0) {
+                    dropdown.style.display = 'block';
+                    validResults.forEach(item => {
+                        const title = item.title || item.name;
+                        const year = (item.release_date || item.first_air_date || 'N/A').split('-')[0];
+                        const poster = item.poster_path ? `https://tmdb.org{item.poster_path}` : 'https://placeholder.com';
+                        
+                        const div = document.createElement('div');
+                        div.className = 'result-item';
+                        div.innerHTML = `<img src="${poster}"><div><strong>${title}</strong><br><small>${item.media_type.toUpperCase()} • ${year}</small></div>`;
+                        div.onclick = () => selectMedia(item.id, item.media_type);
+                        dropdown.appendChild(div);
+                    });
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            } catch (err) {
+                console.error("Search directory error:", err);
+            }
+        }
+
+        function selectMedia(id, type) {
+            activeMedia.id = id;
+            activeMedia.type = type;
+            
+            document.getElementById('dropdown').style.display = 'none';
+            document.getElementById('searchInput').value = "";
+            document.getElementById('placeholder').style.display = 'none';
+            document.getElementById('mainStreamPlayer').style.display = 'block';
+            
+            updatePlayer();
+        }
+
+        function updatePlayer() {
+            if (!activeMedia.id) return;
+            
+            const server = document.getElementById('serverSelect').value;
+            const player = document.getElementById('mainStreamPlayer');
+            
+            // The scripts automatically find the files for you using the catalog matching
+            if (server === 'vidlink') {
+                player.src = `https://vidlink.pro{activeMedia.type}/${activeMedia.id}?primaryColor=e50914&autoplay=true`;
+            } else if (server === 'vidsrc') {
+                player.src = `https://2embed.cc{activeMedia.id}`;
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-box-container')) {
+                document.getElementById('dropdown').style.display = 'none';
+            }
+        });
+    </script>
 </body>
 </html>
